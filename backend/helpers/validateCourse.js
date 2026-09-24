@@ -1,4 +1,3 @@
-
 function validateCourse(input = {}) {
   const errors = {};
 
