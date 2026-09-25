@@ -18,7 +18,7 @@ const Course = {
       "SELECT * FROM courses WHERE id = ?",
       [id]
     );
-
+ 
     return rows[0];
   },
 
