@@ -1,415 +1,185 @@
+
 const db = require("../config/db");
 
-
 const Enrollment = {
-
-  // ====================================================
-  // CREATE ENROLLMENT
-  // ATOMIC CAPACITY CHECK
-  // ====================================================
-
+  // Create enrollment
   async create(studentId, courseId) {
+    const [result] = await db.execute(
+      `INSERT INTO enrollments (student_id, course_id)
+       VALUES (?, ?)`,
+      [studentId, courseId]
+    );
 
-    const connection =
-      await db.getConnection();
-
-    try {
-
-      // ------------------------------------------------
-      // START TRANSACTION
-      // ------------------------------------------------
-
-      await connection.beginTransaction();
-
-
-      // ------------------------------------------------
-      // LOCK COURSE ROW
-      //
-      // FOR UPDATE prevents two concurrent enrollment
-      // requests from checking the same capacity
-      // simultaneously.
-      // ------------------------------------------------
-
-      const [courseRows] =
-        await connection.execute(
-          `
-          SELECT
-            id,
-            max_students
-          FROM courses
-          WHERE id = ?
-          FOR UPDATE
-          `,
-          [courseId]
-        );
-
-
-      if (courseRows.length === 0) {
-
-        const error =
-          new Error("COURSE_NOT_FOUND");
-
-        throw error;
-      }
-
-
-      const course =
-        courseRows[0];
-
-
-      // ------------------------------------------------
-      // CHECK EXISTING ENROLLMENT
-      // ------------------------------------------------
-
-      const [existingRows] =
-        await connection.execute(
-          `
-          SELECT id
-          FROM enrollments
-          WHERE student_id = ?
-          AND course_id = ?
-          LIMIT 1
-          `,
-          [
-            studentId,
-            courseId,
-          ]
-        );
-
-
-      if (existingRows.length > 0) {
-
-        const error =
-          new Error("ALREADY_ENROLLED");
-
-        throw error;
-      }
-
-
-      // ------------------------------------------------
-      // COUNT CURRENT APPROVED ENROLLMENTS
-      // ------------------------------------------------
-
-      const [countRows] =
-        await connection.execute(
-          `
-          SELECT COUNT(*) AS enrolled_count
-          FROM enrollments
-          WHERE course_id = ?
-          `,
-          [courseId]
-        );
-
-
-      const enrolledCount =
-        Number(countRows[0].enrolled_count);
-
-
-      // ------------------------------------------------
-      // CAPACITY CHECK
-      //
-      // NULL = unlimited
-      // ------------------------------------------------
-
-      if (
-        course.max_students !== null &&
-        enrolledCount >=
-          Number(course.max_students)
-      ) {
-
-        const error =
-          new Error("COURSE_FULL");
-
-        throw error;
-      }
-
-
-      // ------------------------------------------------
-      // INSERT ENROLLMENT
-      // ------------------------------------------------
-
-      const [result] =
-        await connection.execute(
-          `
-          INSERT INTO enrollments
-          (
-            student_id,
-            course_id
-          )
-          VALUES (?, ?)
-          `,
-          [
-            studentId,
-            courseId,
-          ]
-        );
-
-
-      // ------------------------------------------------
-      // COMMIT
-      // ------------------------------------------------
-
-      await connection.commit();
-
-
-      return result.insertId;
-
-    } catch (error) {
-
-      // ------------------------------------------------
-      // ROLLBACK
-      // ------------------------------------------------
-
-      try {
-        await connection.rollback();
-      } catch (rollbackError) {
-        console.error(
-          "Rollback error:",
-          rollbackError.message
-        );
-      }
-
-
-      throw error;
-
-    } finally {
-
-      // ------------------------------------------------
-      // RELEASE CONNECTION
-      // ------------------------------------------------
-
-      connection.release();
-    }
+    return result.insertId;
   },
 
-
-  // ====================================================
-  // CHECK EXISTING ENROLLMENT
-  // ====================================================
-
-  async findByStudentAndCourse(
-    studentId,
-    courseId
-  ) {
-
-    const [rows] =
-      await db.execute(
-        `
-        SELECT *
-        FROM enrollments
-        WHERE student_id = ?
-        AND course_id = ?
-        `,
-        [
-          studentId,
-          courseId,
-        ]
-      );
-
+  // Check duplicate enrollment
+  async findByStudentAndCourse(studentId, courseId) {
+    const [rows] = await db.execute(
+      `SELECT *
+       FROM enrollments
+       WHERE student_id = ? AND course_id = ?`,
+      [studentId, courseId]
+    );
 
     return rows[0];
   },
 
-
-  // ====================================================
-  // GET MY ENROLLMENTS
-  // ====================================================
-
+  // Get a student's enrolled courses
   async getByStudent(studentId) {
-
-    const [rows] =
-      await db.execute(
-        `
-        SELECT
-          e.id,
-          e.enrolled_at,
-
-          c.id AS course_id,
-          c.title,
-          c.category,
-          c.level,
-          c.duration,
-          c.price,
-          c.image,
-          c.description,
-
-          c.max_students,
-
-          (
-            SELECT COUNT(*)
-            FROM enrollments e2
-            WHERE e2.course_id = c.id
-          ) AS enrolled_count,
-
-          CASE
-            WHEN c.max_students IS NULL
-              THEN NULL
-            ELSE
-              c.max_students -
-              (
-                SELECT COUNT(*)
-                FROM enrollments e3
-                WHERE e3.course_id = c.id
-              )
-          END AS seats_remaining,
-
-          CASE
-            WHEN c.max_students IS NULL
-              THEN FALSE
-            WHEN
-              (
-                SELECT COUNT(*)
-                FROM enrollments e4
-                WHERE e4.course_id = c.id
-              ) >= c.max_students
-              THEN TRUE
-            ELSE FALSE
-          END AS is_full
-
-        FROM enrollments e
-
-        JOIN courses c
-          ON e.course_id = c.id
-
-        WHERE e.student_id = ?
-
-        ORDER BY e.enrolled_at DESC
-        `,
-        [studentId]
-      );
-
+    const [rows] = await db.execute(
+      `SELECT
+         e.id,
+         e.enrolled_at,
+         c.id AS course_id,
+         c.title,
+         c.category,
+         c.level,
+         c.duration,
+         c.price,
+         c.image,
+         c.description
+       FROM enrollments e
+       JOIN courses c ON e.course_id = c.id
+       WHERE e.student_id = ?
+       ORDER BY e.enrolled_at DESC, e.id DESC`,
+      [studentId]
+    );
 
     return rows;
   },
 
-
-  // ====================================================
-  // GET COURSE ENROLLMENTS
-  // ====================================================
-
+  // Get students enrolled in a course
   async getByCourse(courseId) {
-
-    const [rows] =
-      await db.execute(
-        `
-        SELECT
-          e.id,
-          e.enrolled_at,
-
-          u.id AS student_id,
-          u.username,
-          u.full_name
-
-        FROM enrollments e
-
-        JOIN users u
-          ON e.student_id = u.id
-
-        WHERE e.course_id = ?
-
-        ORDER BY e.enrolled_at DESC
-        `,
-        [courseId]
-      );
-
+    const [rows] = await db.execute(
+      `SELECT
+         e.id,
+         e.enrolled_at,
+         u.id AS student_id,
+         u.username,
+         u.full_name
+       FROM enrollments e
+       JOIN users u ON e.student_id = u.id
+       WHERE e.course_id = ?
+       ORDER BY e.enrolled_at DESC, e.id DESC`,
+      [courseId]
+    );
 
     return rows;
   },
 
+  // CR-008: Server-side search, filtering, sorting and pagination
+  async getAll(options = {}) {
+    const {
+      q = "",
+      courseId = null,
+      from = null,
+      to = null,
+      sort = "date",
+      order = "desc",
+      page = 1,
+      limit = 20
+    } = options;
 
-  // ====================================================
-  // GET ALL ENROLLMENTS
-  // ====================================================
+    const sortColumns = {
+      date: "e.enrolled_at",
+      student: "u.full_name",
+      course: "c.title"
+    };
 
-  async getAll() {
+    const sortColumn = sortColumns[sort];
 
-    const [rows] =
-      await db.execute(
-        `
-        SELECT
-          e.id,
-          e.enrolled_at,
+    if (!sortColumn) {
+      throw new Error("Invalid sort field");
+    }
 
-          u.id AS student_id,
-          u.username,
-          u.full_name,
+    const sortOrder = order === "asc" ? "ASC" : "DESC";
+    const conditions = [];
+    const params = [];
 
-          c.id AS course_id,
-          c.title,
-          c.category,
-          c.level,
-          c.max_students,
+    if (q) {
+      // Treat %, _ and ! as literal search characters.
+      const escapedSearch = q.replace(/[!%_]/g, "!$&");
+      const pattern = `%${escapedSearch}%`;
 
-          (
-            SELECT COUNT(*)
-            FROM enrollments e2
-            WHERE e2.course_id = c.id
-          ) AS enrolled_count
-
-        FROM enrollments e
-
-        JOIN users u
-          ON e.student_id = u.id
-
-        JOIN courses c
-          ON e.course_id = c.id
-
-        ORDER BY e.enrolled_at DESC
-        `
+      conditions.push(
+        `(u.full_name LIKE ? ESCAPE '!' OR
+          u.username LIKE ? ESCAPE '!')`
       );
 
+      params.push(pattern, pattern);
+    }
 
-    return rows;
+    if (courseId !== null) {
+      conditions.push("e.course_id = ?");
+      params.push(courseId);
+    }
+
+    if (from !== null) {
+      conditions.push("e.enrolled_at >= ?");
+      params.push(`${from} 00:00:00`);
+    }
+
+    if (to !== null) {
+      conditions.push(
+        "e.enrolled_at < DATE_ADD(?, INTERVAL 1 DAY)"
+      );
+      params.push(to);
+    }
+
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+
+    // Count all records matching the same filters.
+    const [countRows] = await db.execute(
+      `SELECT COUNT(*) AS total
+       FROM enrollments e
+       JOIN users u ON e.student_id = u.id
+       JOIN courses c ON e.course_id = c.id
+       ${whereClause}`,
+      params
+    );
+
+    const total = Number(countRows[0].total);
+    const offset = (page - 1) * limit;
+
+    // Retrieve only the requested page.
+    const [rows] = await db.execute(
+      `SELECT
+         e.id,
+         e.enrolled_at,
+         u.id AS student_id,
+         u.username,
+         u.full_name,
+         c.id AS course_id,
+         c.title,
+         c.category,
+         c.level
+       FROM enrollments e
+       JOIN users u ON e.student_id = u.id
+       JOIN courses c ON e.course_id = c.id
+       ${whereClause}
+       ORDER BY ${sortColumn} ${sortOrder}, e.id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    return {
+      enrollments: rows,
+      total
+    };
   },
 
-
-  // ====================================================
-  // ADMIN DELETE
-  // ====================================================
-
+  // Delete enrollment
   async delete(id) {
-
-    const [result] =
-      await db.execute(
-        `
-        DELETE FROM enrollments
-        WHERE id = ?
-        `,
-        [id]
-      );
-
+    const [result] = await db.execute(
+      `DELETE FROM enrollments WHERE id = ?`,
+      [id]
+    );
 
     return result;
-  },
-
-
-  // ====================================================
-  // STUDENT DELETE
-  // ====================================================
-
-  async deleteByStudent(
-    enrollmentId,
-    studentId
-  ) {
-
-    const [result] =
-      await db.execute(
-        `
-        DELETE FROM enrollments
-        WHERE id = ?
-        AND student_id = ?
-        `,
-        [
-          enrollmentId,
-          studentId,
-        ]
-      );
-
-
-    return result;
-  },
-
+  }
 };
-
 
 module.exports = Enrollment;

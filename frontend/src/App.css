@@ -2082,3 +2082,96 @@ textarea.input {
   }
 
 }
+/* CR-008: Enrollment filtering and pagination */
+
+.cr008-filters {
+  margin-bottom: 24px;
+  padding: 20px;
+}
+
+.cr008-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.cr008-filter-grid .form-group {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.cr008-filter-grid label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+
+.cr008-filter-grid .input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.cr008-reset-wrap .btn {
+  width: 100%;
+}
+
+.cr008-total {
+  margin: 0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.cr008-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 0 4px;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 18px;
+}
+
+.cr008-range,
+.cr008-page-info {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.cr008-pagination-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cr008-pagination-buttons .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1000px) {
+  .cr008-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .cr008-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cr008-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cr008-pagination-buttons {
+    width: 100%;
+  }
+
+  .cr008-pagination-buttons .btn {
+    flex: 1;
+  }
+}
