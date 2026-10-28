@@ -120,3 +120,31 @@ export function isStudent() {
 
   return getUserRole() === "student";
 }
+
+
+// =====================================================
+// UPDATE STORED USER (after profile changes)
+// =====================================================
+
+export function updateStoredUser(changes) {
+
+  const currentUser = getUser();
+
+  if (!currentUser) {
+    return null;
+  }
+
+  // Only allow safe display fields to be refreshed.
+  // Role and username always keep their stored values.
+  const updatedUser = {
+    ...currentUser,
+    full_name: changes.full_name ?? currentUser.full_name,
+  };
+
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify(updatedUser)
+  );
+
+  return updatedUser;
+}

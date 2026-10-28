@@ -10,6 +10,9 @@ import CourseDetails from "./pages/CourseDetails";
 import StudentDashboard from "./pages/StudentDashboard";
 import MyEnrollments from "./pages/MyEnrollments";
 
+// ---------- Shared (student + admin) ----------
+import Profile from "./pages/Profile";
+
 // ---------- Admin pages ----------
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageCourses from "./pages/ManageCourses";
@@ -86,6 +89,18 @@ function App() {
           element={
             <ProtectedRoute role="admin">
               <ManageEnrollments />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* PROFILE - any logged-in user (student or admin) */}
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute role={["student", "admin"]}>
+              <Profile />
             </ProtectedRoute>
           }
         />

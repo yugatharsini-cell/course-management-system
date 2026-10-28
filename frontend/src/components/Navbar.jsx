@@ -10,6 +10,7 @@ import {
   FaTachometerAlt,
   FaTimes,
   FaUser,
+  FaUserCircle,
   FaUserGraduate,
   FaUsers,
 } from "react-icons/fa";
@@ -139,6 +140,16 @@ function Navbar() {
                 Manage Enrollments
               </NavLink>
             </>
+          )}
+
+
+          {/* ---------- CR-010: Profile link (student + admin) ---------- */}
+
+          {loggedIn && (
+            <NavLink to="/profile" className={linkClass} onClick={closeMenu}>
+              <FaUserCircle />
+              Profile
+            </NavLink>
           )}
 
 

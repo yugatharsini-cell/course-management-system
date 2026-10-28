@@ -62,6 +62,13 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // CR-010: a wrong "current password" on the change-password
+      // form also returns 401. That is a validation error, not an
+      // expired session, so do NOT log the user out.
+      if (requestURL.includes("/users/me/password")) {
+        return Promise.reject(error);
+      }
+
 
       // Prevent multiple simultaneous
       // 401 responses from causing

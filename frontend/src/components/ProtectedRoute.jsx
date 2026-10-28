@@ -27,7 +27,13 @@ function ProtectedRoute({ children, role }) {
     );
   }
 
-  if (role && user.role !== role) {
+  // role can be a single role ("admin") or a list (["student", "admin"]).
+  // If no role is given, any logged-in user may enter (e.g. /profile).
+  const allowedRoles = role
+    ? (Array.isArray(role) ? role : [role])
+    : null;
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
 
     return (
       <div className="access-denied-container">

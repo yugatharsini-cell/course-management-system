@@ -2238,3 +2238,37 @@ textarea.input {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   CR-010: Profile page
+   ========================================= */
+
+.profile-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.profile-details dt {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.profile-details dd {
+  margin: 2px 0 0;
+  font-weight: bold;
+  color: var(--color-dark);
+  overflow-wrap: anywhere;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 460px;
+}
+
+.profile-form .btn {
+  align-self: flex-start;
+}
