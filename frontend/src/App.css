@@ -2175,3 +2175,66 @@ textarea.input {
     flex: 1;
   }
 }
+
+
+/* =========================================================
+   CR-009
+   Reporting and Analytics (dashboard report sections)
+   ========================================================= */
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+
+  margin-bottom: 4px;
+}
+
+/* Dates inside stat cards are smaller than numbers */
+.dashboard-date-value {
+  font-size: 1.4rem;
+}
+
+/* Simple CSS bar (no chart library) */
+.report-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  min-width: 140px;
+}
+
+.report-bar-track {
+  flex: 1;
+
+  height: 10px;
+
+  background-color: var(--color-border);
+  border-radius: 999px;
+
+  overflow: hidden;
+}
+
+.report-bar-fill {
+  height: 100%;
+
+  background-color: var(--color-primary);
+  border-radius: 999px;
+
+  transition: width 0.3s ease;
+}
+
+.report-bar-value {
+  min-width: 24px;
+
+  font-weight: bold;
+  color: var(--color-dark);
+
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   FaBook,
@@ -15,19 +15,9 @@ import Footer from "../components/Footer";
 
 
 /*
- * Safely convert a price into a number.
- *
- * Handles:
- * - number
- * - numeric string
- * - 0
- * - null / undefined
- * - invalid values
- *
- * Invalid values become 0 so NaN is never displayed.
+ * Safely convert a value into a number so NaN is never displayed.
  */
-const toSafePrice = (value) => {
-
+const toSafeNumber = (value) => {
   const number = Number(value);
 
   return Number.isFinite(number)
@@ -40,23 +30,32 @@ const toSafePrice = (value) => {
  * Format price for display.
  */
 const formatPrice = (value) => {
-
-  return toSafePrice(value).toLocaleString(undefined, {
+  return toSafeNumber(value).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
 
+
+const formatDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return date.toLocaleDateString();
 };
 
 
 function StudentDashboard() {
 
-  const [enrollments, setEnrollments] = useState([]);
-
-  const [stats, setStats] = useState({
-    courseCount: 0,
-    studentCount: 0,
-  });
+  // CR-009: report calculated by the server (GET /reports/my)
+  const [report, setReport] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,32 +69,9 @@ function StudentDashboard() {
 
       try {
 
-        const [
-          enrollmentsResponse,
-          statsResponse,
-        ] = await Promise.all([
+        const response = await api.get("/reports/my");
 
-          api.get("/enrollments/my"),
-
-          api.get("/courses/stats"),
-
-        ]);
-
-
-        setEnrollments(
-          enrollmentsResponse.data.enrollments || []
-        );
-
-
-        setStats({
-
-          courseCount:
-            statsResponse.data.courseCount || 0,
-
-          studentCount:
-            statsResponse.data.studentCount || 0,
-
-        });
+        setReport(response.data.report || null);
 
       } catch (error) {
 
@@ -117,66 +93,19 @@ function StudentDashboard() {
   }, []);
 
 
-  /*
-   * Calculate the total enrolled-course value
-   * from the already-loaded enrollment response.
-   *
-   * No additional API request is required.
-   */
-  const totalEnrollmentValue = useMemo(() => {
+  const recentEnrollments = report?.recentEnrollments || [];
 
-    return enrollments.reduce((total, enrollment) => {
+  // "..." while loading, "-" if the report failed to load
+  const show = (value) => {
+    if (loading) return "...";
+    if (!report) return "-";
+    return toSafeNumber(value);
+  };
 
-      return total + toSafePrice(enrollment.price);
-
-    }, 0);
-
-  }, [enrollments]);
-
-
-  /*
-   * Only show the 3 most recent enrollments on the dashboard.
-   *
-   * Copy the array before sorting so that the original
-   * enrollment data is not modified.
-   */
-  const recentEnrollments = useMemo(() => {
-
-    return [...enrollments]
-      .sort((a, b) => {
-
-        const aTime = new Date(a.enrolled_at).getTime();
-        const bTime = new Date(b.enrolled_at).getTime();
-
-        const aInvalid = Number.isNaN(aTime);
-        const bInvalid = Number.isNaN(bTime);
-
-        if (aInvalid && bInvalid) return 0;
-        if (aInvalid) return 1;
-        if (bInvalid) return -1;
-
-        return bTime - aTime;
-
-      })
-      .slice(0, 3);
-
-  }, [enrollments]);
-
-
-  const formatDate = (value) => {
-
-    if (!value) {
-      return "-";
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return "-";
-    }
-
-    return date.toLocaleDateString();
-
+  const showDate = (value) => {
+    if (loading) return "...";
+    if (!report) return "-";
+    return formatDate(value);
   };
 
 
@@ -232,9 +161,7 @@ function StudentDashboard() {
           <div className="dashboard-card">
 
             <span className="dashboard-card-value">
-              {loading
-                ? "..."
-                : enrollments.length}
+              {show(report?.enrolledCourses)}
             </span>
 
             <span className="dashboard-card-label">
@@ -247,13 +174,11 @@ function StudentDashboard() {
           <div className="dashboard-card">
 
             <span className="dashboard-card-value">
-              {loading
-                ? "..."
-                : stats.courseCount}
+              {show(report?.distinctCategories)}
             </span>
 
             <span className="dashboard-card-label">
-              Courses Available
+              Categories Studied
             </span>
 
           </div>
@@ -261,14 +186,25 @@ function StudentDashboard() {
 
           <div className="dashboard-card">
 
-            <span className="dashboard-card-value">
-              {loading
-                ? "..."
-                : stats.studentCount}
+            <span className="dashboard-card-value dashboard-date-value">
+              {showDate(report?.earliestEnrollmentDate)}
             </span>
 
             <span className="dashboard-card-label">
-              Registered Students
+              First Enrollment
+            </span>
+
+          </div>
+
+
+          <div className="dashboard-card">
+
+            <span className="dashboard-card-value dashboard-date-value">
+              {showDate(report?.latestEnrollmentDate)}
+            </span>
+
+            <span className="dashboard-card-label">
+              Latest Enrollment
             </span>
 
           </div>
@@ -285,7 +221,9 @@ function StudentDashboard() {
             <span className="dashboard-card-value dashboard-price-value">
               {loading
                 ? "..."
-                : `Rs. ${formatPrice(totalEnrollmentValue)}`}
+                : !report
+                  ? "-"
+                  : `Rs. ${formatPrice(report.totalEnrollmentValue)}`}
             </span>
 
             <span className="dashboard-card-label">
@@ -327,6 +265,7 @@ function StudentDashboard() {
 
 
           {!loading &&
+            report &&
             recentEnrollments.length === 0 && (
 
               <p className="empty">
@@ -338,86 +277,57 @@ function StudentDashboard() {
             )}
 
 
-          {!loading &&
-            recentEnrollments.length > 0 && (
+          {!loading && recentEnrollments.length > 0 && (
 
-              <div className="table-wrapper">
+            <div className="table-wrapper">
 
-                <table className="table">
+              <table className="table">
 
-                  <thead>
+                <thead>
 
-                    <tr>
+                  <tr>
+                    <th>Course</th>
+                    <th>Category</th>
+                    <th>Level</th>
+                    <th>Enrolled On</th>
+                  </tr>
 
-                      <th>
-                        Course
-                      </th>
+                </thead>
 
-                      <th>
-                        Category
-                      </th>
 
-                      <th>
-                        Level
-                      </th>
+                <tbody>
 
-                      <th>
-                        Enrolled On
-                      </th>
+                  {recentEnrollments.map((enrollment) => (
+
+                    <tr key={enrollment.id}>
+
+                      <td>
+                        <Link
+                          to={`/courses/${enrollment.courseId}`}
+                        >
+                          {enrollment.title}
+                        </Link>
+                      </td>
+
+                      <td>{enrollment.category || "-"}</td>
+
+                      <td>{enrollment.level || "-"}</td>
+
+                      <td>
+                        {formatDate(enrollment.enrolledAt)}
+                      </td>
 
                     </tr>
 
-                  </thead>
+                  ))}
 
+                </tbody>
 
-                  <tbody>
+              </table>
 
-                    {recentEnrollments.map(
-                      (enrollment) => (
+            </div>
 
-                        <tr
-                          key={enrollment.id}
-                        >
-
-                          <td>
-
-                            <Link
-                              to={`/courses/${enrollment.course_id}`}
-                            >
-                              {enrollment.title}
-                            </Link>
-
-                          </td>
-
-
-                          <td>
-                            {enrollment.category}
-                          </td>
-
-
-                          <td>
-                            {enrollment.level}
-                          </td>
-
-
-                          <td>
-                            {formatDate(
-                              enrollment.enrolled_at
-                            )}
-                          </td>
-
-                        </tr>
-
-                      )
-                    )}
-
-                  </tbody>
-
-                </table>
-
-              </div>
-
-            )}
+          )}
 
         </section>
 
